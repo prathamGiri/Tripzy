@@ -123,6 +123,7 @@ await stage('chapter', 3, 'Everyone answers once — in 90 seconds', 'Budget, tr
 await tap(btn(/Add my own preferences/), 1200)
 await tap(btn(/^₹20,000$/), 900)
 await tap(btn(/^Next/), 900)
+await tap(btn(/^Next/), 700) // "travelling from" — keeps the trip's default city
 await tap(btn(/Relaxed/), 1300)
 for (const i of [/Beaches$/, /Food$/, /Nightlife$/]) await tap(btn(i), 350)
 await wait(500)
@@ -141,6 +142,8 @@ await wait(2200)
 await tap(btn(/Let’s go/), 900)
 await tap(btn(/^₹20,000$/), 600)
 await tap(btn(/^Next/), 800)
+await tap(btn(/^Delhi$/), 500) // Kabir travels from another city
+await tap(btn(/^Next/), 700)
 await tap(btn(/Adventure/), 1300)
 for (const i of [/Adventure$/, /Nature$/, /Food$/]) await tap(btn(i), 300)
 await tap(btn(/^Next/), 800)

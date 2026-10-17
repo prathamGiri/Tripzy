@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Search } from 'lucide-react'
-import { dateRange, fmtRange, ORIGINS, POPULAR_DESTINATIONS, type CreateTripInput } from '@tripzy/shared'
+import { dateRange, fmtRange, POPULAR_DESTINATIONS, type CreateTripInput } from '@tripzy/shared'
 import { DEMO_TOOLS } from '../lib/api'
 import { gradient } from '../lib/gradients'
 import { useTrip } from '../state/TripContext'
@@ -19,7 +19,6 @@ const DEFAULTS: CreateTripInput = {
   name: 'Goa with the gang',
   organizerName: 'Arjun',
   destinationQuery: 'Goa',
-  origin: 'Mumbai',
   windowStart: '2026-12-12',
   windowEnd: '2026-12-22',
   days: 4,
@@ -54,7 +53,7 @@ export default function CreateTrip() {
   const windowLen = dateRange(f.windowStart, f.windowEnd).length
   const maxDays = Math.min(10, Math.max(2, windowLen))
   const days = Math.min(f.days, maxDays)
-  const valid = f.name.trim() && f.organizerName.trim() && f.origin.trim() && (f.destinationQuery === null || f.destinationQuery.trim().length >= 2)
+  const valid = f.name.trim() && f.organizerName.trim() && (f.destinationQuery === null || f.destinationQuery.trim().length >= 2)
 
   return (
     <div className="animate-fade-up">
@@ -112,16 +111,6 @@ export default function CreateTrip() {
               }}
             />
           </label>
-        </Field>
-
-        <Field label="Everyone’s starting from">
-          <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-            {ORIGINS.map((o) => (
-              <Chip key={o} className="shrink-0" selected={f.origin === o} onClick={() => set('origin', o)}>
-                {o}
-              </Chip>
-            ))}
-          </div>
         </Field>
 
         <Field label="Rough dates" hint="Friends pick exact days they’re free">

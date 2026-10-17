@@ -17,7 +17,12 @@ Types referenced below live in `packages/shared/src/types.ts`; request schemas i
 | `PUT /trips/:id/members/me/prefs` | member | `Preferences` | `TripView` |
 | `POST /trips/:id/plans` | organizer | – | `202 JobView` (returns the running job if one exists; 400 if < 2 responses) |
 | `GET /trips/:id/plans/jobs/:jobId` | member | – | `JobView` — poll until `status` is `done` or `failed` |
-| `PATCH /trips/:id/plan` | member | `{ stayId?, transportId? }` | `TripView` |
+| `PATCH /trips/:id/plan` | see below | `{ stayId?, transportId?, origin? }` | `TripView` — marks the itinerary out of date |
+| `POST /trips/:id/plan/adjust` | organizer or sole traveller | – | `202 JobView` — re-times the itinerary around the current stay/travel, keeping votes and swaps |
+| `PUT /trips/:id/bookings/stay` | organizer | `StayBookingInput` | `TripView` — then updates the itinerary automatically |
+| `DELETE /trips/:id/bookings/stay` | organizer | – | `TripView` |
+| `PUT /trips/:id/bookings/travel/:origin` | see below | `TravelBookingInput` | `TripView` — then updates the itinerary automatically |
+| `DELETE /trips/:id/bookings/travel/:origin` | see below | – | `TripView` |
 | `POST /trips/:id/plan/votes` | member | `{ itemId, value: "up" \| "down" \| null }` | `TripView` |
 | `POST /trips/:id/plan/swaps` | member | `{ slotId, altId \| null }` | `TripView` (also records a 👍 from the swapper) |
 
@@ -28,7 +33,9 @@ Demo-only (`DEMO_MODE=true`, otherwise 404):
 | `GET /demo/trips/:id/tokens` | member | every member's token (for the person switcher) |
 | `POST /demo/sample-trip` | – | a Goa trip where all 6 people have answered: `{ tripId, tokens }` |
 
-After a trip is locked, every write returns `409`.
+**Who can change what.** The stay: the organizer. A starting city's travel: the organizer, or — if exactly one person travels from that city — that person (`TripView.me.editableOrigins` lists them). After a trip is locked, plan changes return `409`; bookings and itinerary updates still work, since that's when people book.
+
+**Per-person costs.** Everyone has a starting city (`Preferences.origin`, default = the trip's `origin`, or `"Already there"`). Travel options are per city (`PlanDocument.travel`), choices per city (`PlanView.transportIds`). Use `personalCost(plan, origin)` from `@tripzy/shared` for one person's total; bookings override suggestions via `effectiveStay` / `effectiveTransport`.
 
 ## Typical flow
 

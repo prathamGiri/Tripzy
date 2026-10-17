@@ -9,9 +9,9 @@ const FRIENDS = ['Aisha', 'Rohan', 'Meera', 'Kabir', 'Neha', 'Vikram', 'Isha', '
 
 /** Answers for the first few friends; dates are fractions of the trip window. */
 const SEEDED: (Omit<Preferences, 'dates'> & { from: number; to: number; minsAgo: number })[] = [
-  { budget: 25000, style: 'party', interests: ['beaches', 'nightlife', 'food', 'photography'], food: [], from: 0.25, to: 1, minsAgo: 12, completedInSec: 74 },
-  { budget: 30000, style: 'adventure', interests: ['adventure', 'nature', 'nightlife', 'food'], food: ['No seafood'], from: 0, to: 0.85, minsAgo: 8, completedInSec: 61 },
-  { budget: 20000, style: 'culture', interests: ['history', 'food', 'shopping', 'photography'], food: ['Vegetarian'], from: 0.4, to: 1, minsAgo: 3, completedInSec: 92 },
+  { budget: 25000, style: 'party', interests: ['beaches', 'nightlife', 'food', 'photography'], food: [], origin: 'Mumbai', from: 0.25, to: 1, minsAgo: 12, completedInSec: 74 },
+  { budget: 30000, style: 'adventure', interests: ['adventure', 'nature', 'nightlife', 'food'], food: ['No seafood'], origin: 'Delhi', from: 0, to: 0.85, minsAgo: 8, completedInSec: 61 },
+  { budget: 20000, style: 'culture', interests: ['history', 'food', 'shopping', 'photography'], food: ['Vegetarian'], origin: 'Mumbai', from: 0.4, to: 1, minsAgo: 3, completedInSec: 92 },
 ]
 
 type SeedMember = Omit<Prisma.MemberUncheckedCreateInput, 'tripId' | 'token'>

@@ -62,20 +62,45 @@ export const AiPlanSchema = z.object({
       }),
     )
     .describe('Exactly three: one budget, one mid, one premium'),
-  transports: z
+  travel: z
     .array(
       z.object({
-        mode: z.enum(['flight', 'train', 'bus', 'car']),
-        label: z.string().describe('e.g. "Konkan Kanya Express · 3AC" or "Non-stop flight BOM → GOX"'),
-        duration: z.string(),
-        departTime: z.string().describe('HH:MM'),
-        pricePerPersonOneWay: z.number(),
-        note: z.string(),
+        origin: z.string().describe('Exactly one of the starting cities given'),
+        options: z
+          .array(
+            z.object({
+              mode: z.enum(['flight', 'train', 'bus', 'car']),
+              label: z.string().describe('e.g. "Konkan Kanya Express · 3AC" or "Non-stop flight BOM → GOX"'),
+              duration: z.string(),
+              departTime: z.string().describe('HH:MM'),
+              arriveTime: z.string().nullable().describe('HH:MM arrival at the destination, or null if unknown'),
+              pricePerPersonOneWay: z.number(),
+              note: z.string(),
+            }),
+          )
+          .describe('2-3 realistic ways to get from this city to the destination, fastest first'),
       }),
     )
-    .describe('2-3 realistic ways to get from the origin city to the destination, fastest first'),
+    .describe('One entry per starting city given (skip people already at the destination)'),
   foodPerDayPerPerson: z.number().describe('Typical INR per person per day for all meals at the planned places'),
   tips: z.array(z.string()).describe('2-4 short practical tips for this group'),
 })
 
 export type RawPlan = z.infer<typeof AiPlanSchema>
+
+/** Reply shape for an itinerary update after stay/travel changes. */
+export const AiAdjustSchema = z.object({
+  days: z.array(
+    z.object({
+      title: z.string(),
+      items: z.array(
+        AiActivity.extend({
+          keepId: z.string().nullable().describe('The id of the existing item this is (possibly re-timed), or null for a new item'),
+        }),
+      ),
+    }),
+  ),
+  summary: z.string().describe('One short sentence for the group on what changed'),
+})
+
+export type RawAdjust = z.infer<typeof AiAdjustSchema>

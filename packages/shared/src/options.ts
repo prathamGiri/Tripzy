@@ -58,3 +58,15 @@ export function gradientFor(name: string): GradientKey {
   for (const c of name.toLowerCase()) h = (h * 31 + c.charCodeAt(0)) | 0
   return GRADIENT_KEYS[Math.abs(h) % GRADIENT_KEYS.length]
 }
+
+/** Starting-city value for people who are already at the destination (no travel to book). */
+export const LOCAL_ORIGIN = 'Already there'
+
+/** Canonical spelling for a starting city: matches the ORIGINS list case-insensitively, else Title Case. */
+export function normalizeOrigin(s: string | null | undefined, fallback = 'Mumbai'): string {
+  const t = (s ?? '').trim().replace(/\s+/g, ' ')
+  if (!t) return fallback
+  if (t.toLowerCase() === LOCAL_ORIGIN.toLowerCase()) return LOCAL_ORIGIN
+  const known = ORIGINS.find((o) => o.toLowerCase() === t.toLowerCase())
+  return known ?? t.replace(/\b\w/g, (c) => c.toUpperCase())
+}

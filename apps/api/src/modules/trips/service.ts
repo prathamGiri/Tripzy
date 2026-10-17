@@ -14,7 +14,7 @@ export async function createTrip(input: CreateTripInput) {
       data: {
         name: input.name,
         destinationQuery: input.destinationQuery,
-        origin: input.origin,
+        origin: input.origin ?? '', // '' = use the organizer's own answer (see groupDefaultOrigin)
         windowStart: input.windowStart,
         windowEnd: input.windowEnd,
         days: input.days,

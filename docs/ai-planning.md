@@ -11,6 +11,12 @@
 5. **Check the budget in code** — `pickStayAndTransport()` recomputes the total itself (the AI's arithmetic is never trusted) and picks the best stay + fastest travel under 95 % of the tightest budget. If nothing fits, the AI gets one retry with the exact overspend as feedback.
 6. **Save** a new plan version; demo friends cast their votes.
 
+## Different starting cities & itinerary updates
+
+- The planner gets every starting city with head-counts and returns travel options **per city** (with arrival times). Day 1 is planned around the last arrival, the last day around the first departure.
+- Stay and travel are picked per city against the tightest budget *in that city group* (`pickStayAndTransport`), so someone from Delhi isn't held to a Mumbai budget and vice versa.
+- After a change or booking, `adjust()` (`ADJUST_PROMPT`) re-times the existing itinerary. Items keep their ids (`keepId`), so votes and swaps survive; changed items are flagged "Updated". The offline planner does a simple deterministic shift.
+
 ## Tuning
 
 | Setting (`apps/api/.env`) | Effect |

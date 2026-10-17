@@ -25,9 +25,10 @@ model Trip {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  members Member[]
-  plans   Plan[]
-  jobs    GenerationJob[]
+  members  Member[]
+  plans    Plan[]
+  jobs     GenerationJob[]
+  bookings Booking[]
 }
 
 model Member {
@@ -42,9 +43,10 @@ model Member {
   respondedAt DateTime?
   createdAt   DateTime  @default(now())
 
-  trip  Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  votes Vote[]
-  swaps Swap[]
+  trip     Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  votes    Vote[]
+  swaps    Swap[]
+  bookings Booking[]
 
   @@index([tripId])
 }
@@ -56,9 +58,12 @@ model Plan {
   isCurrent   Boolean  @default(true)
   source      String // "ai" | "mock"
   document    String // JSON PlanDocument
-  stayId      String
-  transportId String
-  createdAt   DateTime @default(now())
+  stayId       String
+  transportId  String   @default("") // legacy single-origin choice (plans made before per-city travel)
+  transportIds String   @default("{}") // JSON { [origin]: optionId }
+  changes      String   @default("{}") // JSON { stay?: ChangeInfo, travel: { [origin]: ChangeInfo } }
+  stale        String? // JSON { reason, at } when stay/travel changed after the itinerary was planned
+  createdAt    DateTime @default(now())
 
   trip  Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
   votes Vote[]
@@ -86,6 +91,7 @@ model Swap {
   slotId   String // original activity id
   altId    String
   memberId String // who swapped it
+  at       DateTime @default(now())
 
   plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -96,6 +102,7 @@ model Swap {
 model GenerationJob {
   id        String   @id @default(cuid())
   tripId    String
+  kind      String   @default("generate") // generate | adjust
   status    String // queued | running | done | failed
   stage     String
   error     String?
@@ -106,4 +113,24 @@ model GenerationJob {
   trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@index([tripId])
+}
+
+/// Something the group has actually booked. Belongs to the trip (not a plan version) so it survives regeneration.
+model Booking {
+  id          String   @id @default(cuid())
+  tripId      String
+  kind        String // "stay" | "travel"
+  origin      String   @default("") // travel: starting city; "" for the stay
+  optionId    String? // the suggested option that was booked, if any
+  snapshot    String // JSON Stay or TransportOption as booked (priceSource "booked")
+  reference   String?
+  link        String?
+  bookedById  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trip     Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  bookedBy Member @relation(fields: [bookedById], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, kind, origin])
 }

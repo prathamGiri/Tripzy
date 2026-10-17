@@ -62,7 +62,9 @@ Where to change things:
 2. Friends open the link, type their name (no sign-up) and answer 5 questions. Each person gets a secret token stored on their device.
 3. The dashboard shows who's in, common dates, the budget range (individual budgets stay private) and shared interests.
 4. The organizer taps **Generate**. The API runs a background job: it combines everyone's answers → asks the AI for a structured plan → checks each hotel's real price and booking pages on the web → validates it, recomputes all costs itself, picks the best stay + travel that fit the tightest budget (one AI retry if over budget) → adds booking links → saves it. Takes ~85 seconds with `gpt-5.5` at low reasoning effort (≈30 s of that is the hotel price check).
-5. Everyone votes and swaps; the organizer locks the trip; the final screen lists **Book it** links for the chosen stay and travel.
+5. Everyone votes and swaps. People can start from different cities: each sees travel from their own city and **their own cost**. The organizer chooses the stay (and travel for cities several people share); someone travelling alone from a city chooses their own.
+6. "I've booked this" (the suggestion or something else) locks a stay or travel in; the itinerary re-times itself around it (e.g. Day 1 starts after the last arrival). Changing stay/travel shows an **Update itinerary** button. Votes and swaps are kept.
+7. The organizer locks the trip; the final screen is a booking checklist with links for the stay and each person's travel.
 
 More: [docs/architecture.md](docs/architecture.md) · [docs/api.md](docs/api.md) · [docs/ai-planning.md](docs/ai-planning.md) · [docs/mobile-plan.md](docs/mobile-plan.md) · [docs/deployment.md](docs/deployment.md)
 

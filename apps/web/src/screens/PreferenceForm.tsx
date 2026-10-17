@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowRight, ChevronLeft, Lock, Timer } from 'lucide-react'
 import {
-  dayName, dayNum, fmtRange, FOOD_OPTIONS, inr, INTERESTS, monthName, parseDate, POPULAR_DESTINATIONS, STYLES,
+  dayName, dayNum, fmtRange, FOOD_OPTIONS, inr, INTERESTS, LOCAL_ORIGIN, monthName, ORIGINS, parseDate, POPULAR_DESTINATIONS, STYLES,
   type Interest, type Preferences, type Style,
 } from '@tripzy/shared'
 import { gradient } from '../lib/gradients'
@@ -10,7 +10,7 @@ import { useTrip } from '../state/TripContext'
 import { useAction } from '../components/Toast'
 import { Avatar, AvatarStack, BottomBar, Button, Card, Chip, ProgressBar, cx } from '../components/ui'
 
-const STEPS = ['Budget', 'Style', 'Interests', 'Food', 'Dates'] as const
+const STEPS = ['Budget', 'From', 'Style', 'Interests', 'Food', 'Dates'] as const
 const BUDGET_PRESETS = [10000, 15000, 20000, 30000, 50000]
 
 export default function PreferenceForm() {
@@ -35,7 +35,10 @@ function Form() {
   const [done, setDone] = useState(false)
   const [startedAt, setStartedAt] = useState<number | null>(skipWelcome ? Date.now() : null)
   const [now, setNow] = useState(Date.now())
-  const [p, setP] = useState<Preferences>(saved ?? { budget: 20000, style: 'relaxed', interests: [], food: [], dates: [] })
+  // Friends start with the group's usual city pre-selected; the organizer picks their own.
+  const suggestedOrigin = m.isOrganizer ? undefined : t.origin || undefined
+  const [p, setP] = useState<Preferences>({ origin: suggestedOrigin, ...(saved ?? { budget: 20000, style: 'relaxed', interests: [], food: [], dates: [] }) })
+  const [otherCity, setOtherCity] = useState(saved?.origin && ![...ORIGINS, LOCAL_ORIGIN].includes(saved.origin) ? saved.origin : '')
   const [styleTouched, setStyleTouched] = useState(!!saved)
 
   useEffect(() => {
@@ -47,7 +50,7 @@ function Form() {
   const elapsed = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0
   const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
 
-  const canNext = [true, styleTouched, p.interests.length > 0, true, p.dates.length > 0][step] ?? true
+  const canNext = [true, !!p.origin?.trim(), styleTouched, p.interests.length > 0, true, p.dates.length > 0][step] ?? true
   const next = () => {
     if (step < STEPS.length - 1) setStep(step + 1)
     else
@@ -120,6 +123,8 @@ function Form() {
           <div className="mt-2 grid grid-cols-2 gap-y-2 text-sm">
             <div className="text-slate-500">Budget</div>
             <div className="font-semibold">{inr(p.budget)}</div>
+            <div className="text-slate-500">From</div>
+            <div className="font-semibold">{p.origin === LOCAL_ORIGIN ? 'Already there' : p.origin}</div>
             <div className="text-slate-500">Style</div>
             <div className="font-semibold">{STYLES.find((s) => s.id === p.style)?.emoji} {STYLES.find((s) => s.id === p.style)?.label}</div>
             <div className="text-slate-500">Interests</div>
@@ -205,6 +210,49 @@ function Form() {
 
         {step === 1 && (
           <>
+            <h1 className="text-2xl font-extrabold tracking-tight">Where are you travelling from?</h1>
+            <p className="mt-1 text-slate-500">We’ll plan your trains and flights from here — everyone can start somewhere different.</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {ORIGINS.map((o) => (
+                <Chip
+                  key={o}
+                  selected={p.origin === o && !otherCity}
+                  onClick={() => {
+                    setOtherCity('')
+                    setP((q) => ({ ...q, origin: o }))
+                  }}
+                >
+                  {o}
+                </Chip>
+              ))}
+              <Chip
+                selected={p.origin === LOCAL_ORIGIN}
+                onClick={() => {
+                  setOtherCity('')
+                  setP((q) => ({ ...q, origin: LOCAL_ORIGIN }))
+                }}
+              >
+                📍 I’m already there
+              </Chip>
+            </div>
+            <label className="mt-4 block">
+              <div className="mb-1.5 text-sm font-bold text-slate-800">Somewhere else?</div>
+              <input
+                className="w-full rounded-2xl bg-white px-4 py-3 text-[15px] font-medium outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-brand-400"
+                placeholder="Type your city, e.g. Indore"
+                value={otherCity}
+                maxLength={60}
+                onChange={(e) => {
+                  setOtherCity(e.target.value)
+                  setP((q) => ({ ...q, origin: e.target.value.trim() || suggestedOrigin }))
+                }}
+              />
+            </label>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
             <h1 className="text-2xl font-extrabold tracking-tight">What’s your travel style?</h1>
             <p className="mt-1 text-slate-500">Pick the one that sounds most like you.</p>
             <div className="mt-5 space-y-2.5">
@@ -214,7 +262,7 @@ function Form() {
                   onClick={() => {
                     setP({ ...p, style: s.id as Style })
                     setStyleTouched(true)
-                    setTimeout(() => setStep(2), 280)
+                    setTimeout(() => setStep(3), 280)
                   }}
                   className={cx(
                     'flex w-full items-center gap-4 rounded-3xl p-4 text-left transition active:scale-[.98]',
@@ -232,7 +280,7 @@ function Form() {
           </>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <>
             <h1 className="text-2xl font-extrabold tracking-tight">What are you into?</h1>
             <p className="mt-1 text-slate-500">Pick as many as you like.</p>
@@ -257,7 +305,7 @@ function Form() {
           </>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <>
             <h1 className="text-2xl font-extrabold tracking-tight">Any food restrictions?</h1>
             <p className="mt-1 text-slate-500">We’ll make sure every meal works for you.</p>
@@ -274,7 +322,7 @@ function Form() {
           </>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <>
             <h1 className="text-2xl font-extrabold tracking-tight">When are you free?</h1>
             <p className="mt-1 text-slate-500">Tap every day you could travel. The numbers show how many friends are free.</p>
@@ -325,7 +373,7 @@ function Form() {
         )}
       </div>
 
-      {step !== 1 && (
+      {step !== 2 && (
         <BottomBar>
           <Button full size="lg" disabled={!canNext || busy} onClick={next}>
             {step === STEPS.length - 1 ? (busy ? 'Saving…' : 'Submit — I’m in!') : 'Next'} <ArrowRight size={18} />

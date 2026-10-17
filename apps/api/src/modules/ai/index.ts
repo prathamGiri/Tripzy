@@ -12,5 +12,5 @@ export function getPlanner(): Planner {
 }
 
 export { createMockPlanner } from './mock/planner'
-export { toPlanDocument, assertUsable, applyPriceCheck } from './enrich'
-export type { Planner, PlannerInput } from './types'
+export { toPlanDocument, assertUsable, applyPriceCheck, mergeAdjusted } from './enrich'
+export type { AdjustInput, Planner, PlannerInput } from './types'

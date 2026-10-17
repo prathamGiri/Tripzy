@@ -2,7 +2,7 @@
  * Typed client for the Tripzy API. Works anywhere `fetch` exists (browser, React Native, Node 18+).
  * Each call takes the member token explicitly so the caller decides how tokens are stored.
  */
-import type { CreateTripInput } from './schemas'
+import type { CreateTripInput, StayBookingInput, TravelBookingInput } from './schemas'
 import type { InvitePreview, JobView, MemberToken, Preferences, TripView, Vote } from './types'
 
 export class ApiError extends Error {
@@ -51,8 +51,17 @@ export class TripzyApi {
     this.req<TripView>('POST', `/trips/${tripId}/plan/votes`, { body: { itemId, value }, token })
   swap = (tripId: string, slotId: string, altId: string | null, token: string) =>
     this.req<TripView>('POST', `/trips/${tripId}/plan/swaps`, { body: { slotId, altId }, token })
-  select = (tripId: string, sel: { stayId?: string; transportId?: string }, token: string) =>
+  select = (tripId: string, sel: { stayId?: string; transportId?: string; origin?: string }, token: string) =>
     this.req<TripView>('PATCH', `/trips/${tripId}/plan`, { body: sel, token })
+  adjust = (tripId: string, token: string) => this.req<JobView>('POST', `/trips/${tripId}/plan/adjust`, { token })
+
+  bookStay = (tripId: string, input: StayBookingInput, token: string) =>
+    this.req<TripView>('PUT', `/trips/${tripId}/bookings/stay`, { body: input, token })
+  unbookStay = (tripId: string, token: string) => this.req<TripView>('DELETE', `/trips/${tripId}/bookings/stay`, { token })
+  bookTravel = (tripId: string, origin: string, input: TravelBookingInput, token: string) =>
+    this.req<TripView>('PUT', `/trips/${tripId}/bookings/travel/${encodeURIComponent(origin)}`, { body: input, token })
+  unbookTravel = (tripId: string, origin: string, token: string) =>
+    this.req<TripView>('DELETE', `/trips/${tripId}/bookings/travel/${encodeURIComponent(origin)}`, { token })
 
   /* Demo-mode only (the API returns 404 unless DEMO_MODE=true) */
   demoTokens = (tripId: string, token: string) => this.req<MemberToken[]>('GET', `/demo/trips/${tripId}/tokens`, { token })

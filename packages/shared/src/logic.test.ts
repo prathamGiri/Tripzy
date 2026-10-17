@@ -17,6 +17,10 @@ describe('computeOverlap', () => {
     expect(ov.best).toEqual({ dates: ['2026-12-13', '2026-12-14', '2026-12-15'], free: 2 })
     expect(ov.budget).toEqual({ min: 20000, max: 30000, median: 25000 })
   })
+  it('groups people by starting city', () => {
+    const ov = computeOverlap([p(1, ['2026-12-10'], { origin: 'delhi' }), p(1, ['2026-12-10']), p(1, ['2026-12-10'], { origin: 'Already there' })], { ...window, origin: 'Mumbai' })
+    expect(ov.origins).toEqual(expect.arrayContaining([{ key: 'Delhi', count: 1 }, { key: 'Mumbai', count: 1 }, { key: 'Already there', count: 1 }]))
+  })
   it('counts interests, styles and food', () => {
     const ov = computeOverlap([p(1, ['2026-12-10'], { interests: ['food', 'beaches'], style: 'party', food: ['Vegetarian'] }), p(1, ['2026-12-10']), p(1, ['2026-12-10'])], window)
     expect(ov.interests[0]).toEqual({ key: 'food', count: 3 })
@@ -42,9 +46,9 @@ describe('plan maths', () => {
       { id: 's1', pricePerNight: 1000 },
       { id: 's2', pricePerNight: 5000 },
     ],
-    transports: [
-      { id: 't1', price: 4000 },
-      { id: 't2', price: 1000 },
+    travel: [
+      { origin: 'Mumbai', options: [{ id: 't1', price: 4000 }, { id: 't2', price: 1000 }] },
+      { origin: 'Delhi', options: [{ id: 'd1', price: 6000 }, { id: 'd2', price: 2000 }] },
     ],
   } as never
 
@@ -57,12 +61,27 @@ describe('plan maths', () => {
     const r = applySwaps(days, { 'd1-i1': 'd1-i1-a1' })
     expect(r[0].items[0]).toMatchObject({ id: 'd1-i1-a1', slotId: 'd1-i1', swapped: true, cost: 900, time: '10:00' })
   })
-  it('picks the best stay, then the fastest travel that fits the budget', () => {
-    // 5000-stay + fastest (4000×2) = 15600 (too much); 5000-stay + cheap travel = 9600 ≤ 11k × 0.95
-    expect(pickStayAndTransport(doc, days, 11000)).toMatchObject({ stay: { id: 's2' }, transport: { id: 't2' }, fits: true })
+  it("picks the best stay, then each city's fastest travel that fits that city's tightest budget", () => {
+    // Mumbai: 5000-stay + t2 (1000×2) = 9600 ≤ 11k × 0.95. Delhi: 5000-stay + d1 (6000×2) = 19600 ≤ 21k × 0.95
+    expect(pickStayAndTransport(doc, days, [{ origin: 'Mumbai', minBudget: 11000 }, { origin: 'Delhi', minBudget: 21000 }])).toEqual({
+      stay: expect.objectContaining({ id: 's2' }),
+      transportIds: { Mumbai: 't2', Delhi: 'd1' },
+      fits: true,
+    })
+  })
+  it('drops to a cheaper stay when one city cannot afford the better one', () => {
+    // Delhi with 9000: 5000-stay + d2 = 11600 > 8550, 1000-stay + d2 = 7600 ✓
+    expect(pickStayAndTransport(doc, days, [{ origin: 'Mumbai', minBudget: 11000 }, { origin: 'Delhi', minBudget: 9000 }])).toMatchObject({
+      stay: { id: 's1' }, transportIds: { Mumbai: 't2', Delhi: 'd2' }, fits: true,
+    })
+  })
+  it('people already at the destination need no travel', () => {
+    expect(costBreakdown(doc, days, { pricePerNight: 1000 }, null).travel).toBe(0)
   })
   it('falls back to the cheapest combo when nothing fits', () => {
-    expect(pickStayAndTransport(doc, days, 1000)).toMatchObject({ stay: { id: 's1' }, transport: { id: 't2' }, fits: false })
+    expect(pickStayAndTransport(doc, days, [{ origin: 'Mumbai', minBudget: 1000 }])).toMatchObject({
+      stay: { id: 's1' }, transportIds: { Mumbai: 't2', Delhi: 'd2' }, fits: false,
+    })
   })
   it('measures agreement', () => {
     expect(agreement({ a: { m1: 'up', m2: 'down' }, b: { m1: 'down', m2: 'down' } }, ['a', 'b', 'c'])).toBe(50)

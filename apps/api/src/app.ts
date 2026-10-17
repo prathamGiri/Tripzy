@@ -3,6 +3,7 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import { env } from './config/env'
 import { HttpError } from './lib/http'
+import { bookingRoutes } from './modules/bookings/routes'
 import { demoRoutes } from './modules/demo/routes'
 import { memberRoutes } from './modules/members/routes'
 import { planRoutes } from './modules/plans/routes'
@@ -32,6 +33,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   await app.register(memberRoutes)
   await app.register(planRoutes)
   await app.register(voteRoutes)
+  await app.register(bookingRoutes)
   if (env.demoMode) await app.register(demoRoutes)
 
   return app

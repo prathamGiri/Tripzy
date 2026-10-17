@@ -1,7 +1,7 @@
 /** Prompts for the OpenAI planner. Edit here to change the planning behaviour. */
-import { fmtDate, inr, STYLES } from '@tripzy/shared'
+import { fmtDate, inr, LOCAL_ORIGIN, STYLES } from '@tripzy/shared'
 import type { PriceCheckInput } from '../price-check'
-import type { PlannerInput } from '../types'
+import type { AdjustInput, PlannerInput } from '../types'
 
 export const SYSTEM_PROMPT = `You are Tripzy's trip planner. You plan complete group trips within India for groups of friends.
 
@@ -13,7 +13,9 @@ Your plan must be realistic enough that the group could book it today:
 - The total per person (return travel + stay + food + activities + local transport) must fit within the group's TIGHTEST budget. Leave ~5% headroom.
 - Respect every food restriction: meal suggestions must work for everyone.
 - Match the group's dominant travel style and the interests most people share; give the minority something too.
+- People may start from different cities. Give 2-3 travel options for EACH starting city (fastest first, with realistic arrival times). Day 1 starts once the LAST group has arrived: plan an easy "while you wait" for early arrivers, then the group plan. The last day ends in time for the EARLIEST departure home.
 - Day 1 is the arrival day (travel, check-in, an easy evening). The last day is the departure day (light morning, then head home). Plan full days in between.
+- If a stay or travel is already booked, use exactly that and plan around it.
 - Each day has 3-5 timed items in order, with how the group gets between them (mode, minutes, cost per person).
 - Most non-logistics items get 1-2 alternatives the group could swap in for the same slot.
 - "why" fields speak to THIS group (e.g. "4 of 5 of you picked nightlife"), one sentence each.
@@ -27,7 +29,7 @@ export function userPrompt(i: PlannerInput) {
     i.destinationQuery
       ? `Destination: ${i.destinationQuery}`
       : `Destination: not decided — choose the single best destination in India for this group, their budget and these dates.`,
-    `Travelling from: ${i.origin}`,
+    `Starting cities: ${i.origins.map((o) => (o.origin === LOCAL_ORIGIN ? `already at the destination ×${o.people}` : `${o.origin} ×${o.people}`)).join(', ')}. Give travel options for: ${i.origins.filter((o) => o.origin !== LOCAL_ORIGIN).map((o) => o.origin).join(', ') || 'nobody (all local)'}.`,
     `Dates: ${fmtDate(i.dates[0])} to ${fmtDate(i.dates[i.dates.length - 1])} (${i.dates.length} days, ${i.dates.length - 1} nights). Plan exactly ${i.dates.length} days.`,
     `Group size: ${i.groupSize} people (${ov.respondedCount} have shared preferences).`,
     `Budget per person, all-in: tightest ${inr(ov.budget.min)}, median ${inr(ov.budget.median)}, highest ${inr(ov.budget.max)}. Plan to the tightest.`,
@@ -36,6 +38,9 @@ export function userPrompt(i: PlannerInput) {
     `Food restrictions: ${ov.food.length ? ov.food.map((f) => `${f.key} ×${f.count}`).join(', ') : 'none'}.`,
     `Individual answers (anonymous): ${JSON.stringify(i.people)}`,
   ]
+  if (i.booked?.stay) lines.push(`Stay ALREADY BOOKED: ${i.booked.stay.name}, ${i.booked.stay.area}. Use it as the base and list it as the mid-tier stay.`)
+  for (const b of i.booked?.travel ?? [])
+    lines.push(`Travel from ${b.origin} ALREADY BOOKED: ${b.label}${b.arrive ? `, arriving ${b.arrive}` : ''}${b.returnDepart ? `, leaving ${b.returnDepart} on the last day` : ''}.`)
   if (i.feedback) lines.push('', `IMPORTANT — fix this from your previous attempt: ${i.feedback}`)
   return lines.join('\n')
 }
@@ -68,5 +73,32 @@ export function priceCheckPrompt(i: PriceCheckInput) {
       (s, k) =>
         `${k + 1}. ${s.name} — ${s.area} — ${s.tier} tier — planner's guess ${inr(s.roomRate)} per ${s.wholeProperty ? 'night for the whole property' : `room per night, ${s.guestsPerRoom} per room`}`,
     ),
+  ].join('\n')
+}
+
+/* ---------- itinerary update after stay/travel changes ---------- */
+
+export const ADJUST_PROMPT = `You update an existing group-trip itinerary in India after the stay or travel changed.
+
+Change as little as possible:
+- Keep every item that still works, with its keepId set to its existing id. You may change its time and how the group gets there (travelFromPrevious) — e.g. new travel times from a stay in a different area.
+- Re-time Day 1 so it starts after the LAST group arrives (leave ~45-60 min for getting to the stay), with an easy option for early arrivers if the gap is long.
+- On the last day, finish in time for the EARLIEST departure home (leave ~1.5 h for airports, ~1 h for stations).
+- Only add new items (keepId null) or drop items when timing makes them impossible. Keep the same number of days.
+- For kept items, copy title, place, emoji, tags, cost and alternatives unchanged. New items follow the usual rules: real places, INR per person, 1-2 alternatives.
+- summary: one friendly sentence telling the group what changed.`
+
+export function adjustPrompt(i: AdjustInput) {
+  return [
+    `Destination: ${i.destination} (${i.region}). Dates ${i.dates[0]} to ${i.dates[i.dates.length - 1]}.`,
+    `What changed: ${i.reason}`,
+    `Stay: ${i.stay.name}, ${i.stay.area}`,
+    `Travel by starting city:`,
+    ...i.travel.map(
+      (t) =>
+        `- ${t.origin} (×${t.people}): ${t.label} (${t.mode}), departs ${t.depart || '?'}${t.arrive ? `, arrives ${t.arrive}` : `, takes ${t.duration || '?'}`}${t.returnDepart ? `; return leaves ${t.returnDepart} on the last day` : ''}`,
+    ),
+    `Current itinerary (JSON):`,
+    JSON.stringify(i.days),
   ].join('\n')
 }

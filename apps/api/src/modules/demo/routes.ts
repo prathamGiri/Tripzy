@@ -32,9 +32,9 @@ export async function demoRoutes(app: FastifyInstance) {
     // Fill in the organizer and anyone still pending.
     const window = Array.from({ length: 8 }, (_, i) => toISO(new Date(start.getFullYear(), start.getMonth(), start.getDate() + 2 + i)))
     const fill: Preferences[] = [
-      { budget: 22000, style: 'relaxed', interests: ['beaches', 'food', 'nightlife'], food: [], dates: window, completedInSec: 58 },
-      { budget: 24000, style: 'party', interests: ['nightlife', 'beaches', 'wellness'], food: [], dates: window, completedInSec: 66 },
-      { budget: 26000, style: 'adventure', interests: ['nature', 'adventure', 'food'], food: ['Vegetarian'], dates: window, completedInSec: 71 },
+      { budget: 22000, style: 'relaxed', interests: ['beaches', 'food', 'nightlife'], food: [], dates: window, origin: 'Mumbai', completedInSec: 58 },
+      { budget: 24000, style: 'party', interests: ['nightlife', 'beaches', 'wellness'], food: [], dates: window, origin: 'Pune', completedInSec: 66 },
+      { budget: 26000, style: 'adventure', interests: ['nature', 'adventure', 'food'], food: ['Vegetarian'], dates: window, origin: 'Mumbai', completedInSec: 71 },
     ]
     const pending = await db.member.findMany({ where: { tripId: trip.id, prefs: null }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] })
     for (const [i, m] of pending.entries()) {

@@ -6,7 +6,7 @@
 import { useCallback, useState } from 'react'
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams } from 'expo-router'
-import { applySwaps, costBreakdown, fmtRange, inr, type TripView } from '@tripzy/shared'
+import { effectiveStay, effectiveTransport, fmtRange, inr, personalCost, type TripView } from '@tripzy/shared'
 import { api, WEB_URL } from '../../lib/api'
 import { membershipFor } from '../../lib/session'
 import { colors } from '../../lib/theme'
@@ -39,9 +39,9 @@ export default function Trip() {
   const ov = trip.overlap
   const plan = trip.plan
   const doc = plan?.doc
-  const stay = doc?.stays.find((x) => x.id === plan!.stayId)
-  const transport = doc?.transports.find((x) => x.id === plan!.transportId)
-  const total = doc && stay && transport ? costBreakdown(doc, applySwaps(doc.days, plan!.swaps), stay, transport).total : null
+  const stay = plan ? effectiveStay(plan) : null
+  const transport = plan ? effectiveTransport(plan, trip.me.origin) : null
+  const total = plan ? personalCost(plan, trip.me.origin).total : null
 
   return (
     <ScrollView
@@ -76,10 +76,10 @@ export default function Trip() {
         </View>
       )}
 
-      {doc && stay && transport && (
+      {doc && stay && (
         <View style={s.card}>
           <Text style={s.cardTitle}>
-            {doc.destination.emoji} {doc.destination.name} · {inr(total!)} per person
+            {doc.destination.emoji} {doc.destination.name} · your cost {inr(total!)}
           </Text>
           {doc.days.map((d, i) => (
             <Text key={d.date} style={s.row}>
@@ -87,7 +87,7 @@ export default function Trip() {
             </Text>
           ))}
           <Text style={[s.cardTitle, { marginTop: 8 }]}>Book it</Text>
-          {[...transport.links, ...stay.links].map((l) => (
+          {[...(transport?.links ?? []), ...stay.links].map((l) => (
             <Pressable key={l.url} style={s.link} onPress={() => Linking.openURL(l.url)}>
               <Text style={s.linkText}>{l.label} ↗</Text>
             </Pressable>

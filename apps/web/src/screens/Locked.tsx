@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarPlus, Check, Copy, ExternalLink, MessageCircle } from 'lucide-react'
-import { agreement, applySwaps, costBreakdown, fmtDate, inr, votableIds, type BookingLink } from '@tripzy/shared'
+import { agreement, applySwaps, effectiveStay, effectiveTransport, fmtDate, inr, personalCost, votableIds, type BookingLink } from '@tripzy/shared'
 import { gradient } from '../lib/gradients'
 import { inviteUrl, whatsappUrl } from '../lib/share'
 import { useTrip } from '../state/TripContext'
@@ -44,15 +44,18 @@ function Confetti() {
   )
 }
 
-function BookRow({ emoji, title, sub, links }: { emoji: string; title: string; sub: string; links: BookingLink[] }) {
+function BookRow({ emoji, title, sub, links, status }: { emoji: string; title: string; sub: string; links: BookingLink[]; status: string | null }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-3">
+    <div className={`rounded-2xl p-3 ${status ? 'bg-sea-50 ring-1 ring-sea-100' : 'bg-slate-50'}`}>
       <div className="flex items-start gap-2">
         <div className="text-xl">{emoji}</div>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-bold leading-snug">{title}</div>
           <div className="text-xs text-slate-500">{sub}</div>
         </div>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${status ? 'bg-sea-600 text-white' : 'bg-amber-100 text-amber-800'}`}>
+          {status ?? '⏳ To book'}
+        </span>
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {links.map((l) => (
@@ -73,9 +76,14 @@ export default function Locked() {
   const plan = t.plan!
   const doc = plan.doc
   const days = applySwaps(doc.days, plan.swaps)
-  const stay = doc.stays.find((s) => s.id === plan.stayId) ?? doc.stays[0]
-  const transport = doc.transports.find((x) => x.id === plan.transportId) ?? doc.transports[0]
-  const costs = costBreakdown(doc, days, stay, transport)
+  const stay = effectiveStay(plan)
+  const origin = t.me.origin
+  const transport = effectiveTransport(plan, origin)
+  const costs = personalCost(plan, origin)
+  const totals = doc.travel.map((g) => personalCost(plan, g.origin).total)
+  const nameOf = (id: string) => t.members.find((m) => m.id === id)?.name ?? 'someone'
+  const bookedStatus = (b: { bookedBy: { memberId: string } } | null | undefined) => (b ? `✓ Booked by ${nameOf(b.bookedBy.memberId)}` : null)
+  const modeEmoji = (m: string) => (m === 'flight' ? '✈️' : m === 'train' ? '🚆' : m === 'bus' ? '🚌' : '🚗')
   const [copied, setCopied] = useState(false)
   const agree = agreement(plan.votes, votableIds(days, stay.id))
   const start = doc.dates[0]
@@ -84,9 +92,9 @@ export default function Locked() {
   const shareText = [
     `🔒 ${t.name} is ${t.locked ? 'LOCKED' : 'planned'}!`,
     `${doc.destination.emoji} ${doc.destination.name} · ${fmtDate(start)} → ${fmtDate(end)}`,
-    `🧳 ${transport.label}`,
     `🏡 ${stay.name}`,
-    `💰 ${inr(costs.total)} per person, all-in`,
+    ...doc.travel.map((g) => `🧳 From ${g.origin}: ${effectiveTransport(plan, g.origin)?.label ?? 'to be chosen'}`),
+    totals.length > 1 ? `💰 ${inr(Math.min(...totals))}–${inr(Math.max(...totals))} per person, all-in (depends on city)` : `💰 ${inr(costs.total)} per person, all-in`,
     '',
     ...days.map((d, i) => `Day ${i + 1}: ${d.title}`),
     '',
@@ -136,7 +144,7 @@ export default function Locked() {
                 <div className="font-bold">→ {fmtDate(end)}</div>
               </div>
               <div className="rounded-2xl bg-slate-50 p-3">
-                <div className="text-xs text-slate-500">Per person</div>
+                <div className="text-xs text-slate-500">Your cost</div>
                 <div className="text-xl font-extrabold">{inr(costs.total)}</div>
                 <div className="text-xs font-semibold text-sea-700">all-in ✓</div>
               </div>
@@ -144,13 +152,16 @@ export default function Locked() {
 
             <div className="mt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">Book it</div>
             <div className="mt-2 space-y-2">
-              <BookRow
-                emoji={transport.mode === 'flight' ? '✈️' : transport.mode === 'train' ? '🚆' : transport.mode === 'bus' ? '🚌' : '🚗'}
-                title={transport.label}
-                sub={`${transport.duration} · from ${t.origin} · ${inr(transport.price * 2)} return per person`}
-                links={transport.links}
-              />
-              <BookRow emoji={stay.emoji} title={stay.name} sub={`${costs.nights} nights · ${stay.wholeProperty ? "whole place" : `${stay.rooms} rooms`} · ${inr(stay.roomRate)}/${stay.wholeProperty ? "night" : "room/night"} incl. taxes${stay.priceSource === "web" ? " · price checked on the web" : " · estimate"}`} links={stay.links} />
+              {transport && (
+                <BookRow
+                  emoji={modeEmoji(transport.mode)}
+                  title={`Your travel: ${transport.label}`}
+                  sub={[transport.duration, `from ${origin}`, `${inr(transport.price * 2)} return per person`].filter(Boolean).join(' · ')}
+                  links={transport.links}
+                  status={bookedStatus(plan.bookings.travel[origin])}
+                />
+              )}
+              <BookRow emoji={stay.emoji} title={stay.name} sub={`${costs.nights} nights · ${stay.wholeProperty ? "whole place" : `${stay.rooms} rooms`} · ${inr(stay.roomRate)}/${stay.wholeProperty ? "night" : "room/night"} incl. taxes${stay.priceSource === "booked" ? "" : stay.priceSource === "web" ? " · price checked on the web" : " · estimate"}`} links={stay.links} status={bookedStatus(plan.bookings.stay)} />
             </div>
 
             <div className="mt-5 space-y-2">

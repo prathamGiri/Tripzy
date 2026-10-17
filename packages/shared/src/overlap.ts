@@ -1,5 +1,6 @@
 /** Where does the group overlap? Pure functions, used by the API (and anything else that holds raw preferences). */
 import { dateRange } from './format'
+import { normalizeOrigin } from './options'
 import type { Count, Interest, OverlapSummary, Preferences, Style, Tag } from './types'
 
 const median = (xs: number[]) => {
@@ -17,7 +18,7 @@ const countBy = <T extends string>(lists: T[][]): Count<T>[] => {
 
 export function computeOverlap(
   prefs: Preferences[],
-  window: { windowStart: string; windowEnd: string; days: number },
+  window: { windowStart: string; windowEnd: string; days: number; origin?: string },
 ): OverlapSummary {
   const windowDates = dateRange(window.windowStart, window.windowEnd)
   const dateCounts = windowDates.map((d) => ({ date: d, count: prefs.filter((p) => p.dates.includes(d)).length }))
@@ -46,6 +47,7 @@ export function computeOverlap(
     interests: countBy<Interest>(prefs.map((p) => p.interests)),
     styles,
     food: countBy<string>(prefs.map((p) => p.food)),
+    origins: countBy<string>(prefs.map((p) => [normalizeOrigin(p.origin, window.origin)])),
     dominantStyle: styles[0]?.key ?? null,
   }
 }

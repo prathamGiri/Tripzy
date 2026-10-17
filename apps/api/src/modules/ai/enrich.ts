@@ -4,6 +4,7 @@
  */
 import {
   cleanPropertyUrl,
+  normalizeOrigin,
   gradientFor,
   stayLinks,
   transportLinks,
@@ -13,10 +14,13 @@ import {
   TAG_IDS,
 } from '@tripzy/shared'
 import type { PriceCheck } from './price-check'
-import type { RawPlan } from './schema'
+import type { RawAdjust, RawPlan } from './schema'
 
 export interface EnrichContext {
+  /** The trip's default starting city. */
   origin: string
+  /** Every starting city that needs travel options (people already there excluded). */
+  origins: string[]
   dates: string[]
   groupSize: number
   generatedWith: number
@@ -98,16 +102,24 @@ export function toPlanDocument(raw: RawPlan, ctx: EnrichContext): PlanDocument {
         links: stayLinks({ hotelName: s.name, area: s.area, city, checkin, checkout, adults: ctx.groupSize, rooms: room.rooms }, ctx.affiliates),
       }
     }),
-    transports: raw.transports.slice(0, 4).map((t, k) => ({
-      id: `tr-${k + 1}`,
-      mode: t.mode,
-      label: t.label,
-      duration: t.duration,
-      depart: hhmm(t.departTime),
-      price: money(t.pricePerPersonOneWay),
-      note: t.note,
-      links: transportLinks({ mode: t.mode, origin: ctx.origin, destination: city, departDate: checkin, returnDate: checkout }),
-    })),
+    travel: ctx.origins.map((origin, gi) => {
+      const group = raw.travel.find((g) => normalizeOrigin(g.origin) === origin) ?? (ctx.origins.length === 1 ? raw.travel[0] : undefined)
+      return {
+        origin,
+        options: (group?.options ?? []).slice(0, 4).map((t, k) => ({
+          id: `tr-${gi + 1}-${k + 1}`,
+          mode: t.mode,
+          label: t.label,
+          duration: t.duration,
+          depart: hhmm(t.departTime),
+          arrive: t.arriveTime ? hhmm(t.arriveTime) : null,
+          returnDepart: null,
+          price: money(t.pricePerPersonOneWay),
+          note: t.note,
+          links: transportLinks({ mode: t.mode, origin, destination: city, departDate: checkin, returnDate: checkout }),
+        })),
+      }
+    }),
     foodPerDay: money(raw.foodPerDayPerPerson),
     tips: raw.tips.slice(0, 5),
     source: ctx.source,
@@ -121,7 +133,8 @@ export function toPlanDocument(raw: RawPlan, ctx: EnrichContext): PlanDocument {
 export function assertUsable(doc: PlanDocument) {
   if (doc.days.length < 2) throw new Error('The plan has fewer than 2 days')
   if (!doc.stays.length) throw new Error('The plan has no stay options')
-  if (!doc.transports.length) throw new Error('The plan has no travel options')
+  const missing = doc.travel.filter((g) => !g.options.length).map((g) => g.origin)
+  if (missing.length) throw new Error(`The plan has no travel options from ${missing.join(', ')}`)
   if (doc.days.some((d) => !d.items.length)) throw new Error('A day in the plan has no activities')
 }
 
@@ -168,4 +181,50 @@ export function applyPriceCheck(doc: PlanDocument, check: PriceCheck, ctx: Pick<
     }
   })
   return { ...doc, stays, pricesCheckedAt: new Date().toISOString() }
+}
+
+/**
+ * Merge an itinerary update into the plan. Kept items keep their id (so votes and swaps survive),
+ * their content and alternatives; only time and travel change. New items get fresh ids. Changed items are flagged.
+ */
+export function mergeAdjusted(doc: PlanDocument, adj: RawAdjust): PlanDocument {
+  const existing = new Map(doc.days.flatMap((d) => d.items).map((a) => [a.id, a]))
+  const stamp = Date.now().toString(36)
+  const days = doc.days.map((day, di) => {
+    const upd = adj.days[di]
+    if (!upd || !upd.items.length) return day
+    return {
+      ...day,
+      title: upd.title || day.title,
+      items: upd.items.slice(0, 8).map((a, ai) => {
+        const old = a.keepId ? existing.get(a.keepId) : undefined
+        const travel = a.travelFromPrevious
+          ? { mode: a.travelFromPrevious.mode, mins: money(a.travelFromPrevious.minutes), cost: money(a.travelFromPrevious.costPerPerson) }
+          : null
+        if (old) {
+          existing.delete(old.id) // each old item can be kept once
+          const time = hhmm(a.time)
+          const changed = time !== old.time || JSON.stringify(travel) !== JSON.stringify(old.travel)
+          return { ...old, time, travel, updated: changed || old.updated }
+        }
+        const id = `d${di + 1}-u${stamp}${ai}`
+        return {
+          id,
+          time: hhmm(a.time),
+          emoji: a.emoji,
+          title: a.title,
+          place: a.place,
+          cost: money(a.costPerPerson),
+          tags: tags(a.tags),
+          why: a.why,
+          travel,
+          alts: a.alternatives.slice(0, 3).map((x, k) => ({
+            id: `${id}-a${k + 1}`, emoji: x.emoji, title: x.title, place: x.place, cost: money(x.costPerPerson), tags: tags(x.tags), why: x.why,
+          })),
+          updated: true,
+        }
+      }),
+    }
+  })
+  return { ...doc, days }
 }

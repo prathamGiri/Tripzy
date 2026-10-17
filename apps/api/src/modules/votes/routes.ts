@@ -5,12 +5,13 @@ import { requireMember } from '../../lib/auth'
 import { db, fromJson } from '../../lib/db'
 import { HttpError, notFound, parse } from '../../lib/http'
 import { assertNotLocked } from '../trips/service'
-import { tripView } from '../trips/view'
+import { tripView, upgradeDoc } from '../trips/view'
 
 async function currentPlan(tripId: string) {
   const plan = await db.plan.findFirst({ where: { tripId, isCurrent: true } })
   if (!plan) throw notFound('No plan yet')
-  return { plan, doc: fromJson<PlanDocument>(plan.document)! }
+  const trip = await db.trip.findUniqueOrThrow({ where: { id: tripId }, select: { groupSize: true } })
+  return { plan, doc: upgradeDoc(fromJson<PlanDocument>(plan.document)!, trip.groupSize) }
 }
 
 export async function voteRoutes(app: FastifyInstance) {
@@ -23,7 +24,7 @@ export async function voteRoutes(app: FastifyInstance) {
     const ids = new Set([
       ...doc.days.flatMap((d) => d.items.flatMap((a) => [a.id, ...a.alts.map((x) => x.id)])),
       ...doc.stays.map((s) => s.id),
-      ...doc.transports.map((t) => t.id),
+      ...doc.travel.flatMap((g) => g.options.map((t) => t.id)),
     ])
     if (!ids.has(itemId)) throw new HttpError(400, 'Unknown plan item')
 
@@ -50,7 +51,7 @@ export async function voteRoutes(app: FastifyInstance) {
         await tx.swap.upsert({
           where: { planId_slotId: { planId: plan.id, slotId } },
           create: { planId: plan.id, slotId, altId, memberId: me.id },
-          update: { altId, memberId: me.id },
+          update: { altId, memberId: me.id, at: new Date() },
         })
       }
       // Whoever swaps something in obviously likes it.

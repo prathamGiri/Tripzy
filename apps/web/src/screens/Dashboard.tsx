@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Bell, Share2, Sparkles, UserPlus } from 'lucide-react'
-import { dayName, dayNum, fmtDate, fmtRange, inr, INTERESTS, POPULAR_DESTINATIONS, STYLES } from '@tripzy/shared'
+import { dayName, dayNum, fmtDate, fmtRange, inr, INTERESTS, LOCAL_ORIGIN, personalCost, POPULAR_DESTINATIONS, STYLES } from '@tripzy/shared'
 import { inviteUrl, whatsappUrl } from '../lib/share'
+import { ago } from '../lib/time'
 import { useTrip } from '../state/TripContext'
 import { useAction, useToast } from '../components/Toast'
 import { Avatar, BottomBar, Button, Card, PageHeader, cx } from '../components/ui'
@@ -31,15 +32,6 @@ function Ring({ value, total }: { value: number; total: number }) {
 
 function SectionTitle({ children }: { children: ReactNode }) {
   return <div className="mb-2 mt-6 px-1 text-xs font-bold uppercase tracking-wider text-slate-400">{children}</div>
-}
-
-function ago(iso: string | null) {
-  if (!iso) return ''
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins} min ago`
-  const h = Math.round(mins / 60)
-  return h < 24 ? `${h}h ago` : `${Math.round(h / 24)}d ago`
 }
 
 export default function Dashboard() {
@@ -78,7 +70,10 @@ export default function Dashboard() {
           <div className="text-2xl">{t.locked ? '🔒' : '🗺️'}</div>
           <div className="flex-1">
             <div className="font-bold">{t.locked ? 'Trip locked!' : 'Your plan is ready'}</div>
-            <div className="text-sm text-slate-400">{t.locked ? 'See the final plan & booking links' : 'Vote and swap before it’s locked'}</div>
+            <div className="text-sm text-slate-400">
+              Your cost {inr(personalCost(t.plan, t.me.origin).total)}
+              {t.me.origin !== LOCAL_ORIGIN ? ` incl. travel from ${t.me.origin}` : ''} · {t.locked ? 'see the final plan & bookings' : 'vote and swap before it’s locked'}
+            </div>
           </div>
           <ArrowRight size={18} />
         </button>
@@ -119,7 +114,7 @@ export default function Dashboard() {
                 </div>
                 <div className="truncate text-xs text-slate-500">
                   {m.responded
-                    ? `${STYLES.find((s) => s.id === m.style)?.emoji ?? ''} ${STYLES.find((s) => s.id === m.style)?.label ?? ''} · ${m.interests
+                    ? `${m.origin === LOCAL_ORIGIN ? '📍 there' : `from ${m.origin}`} · ${STYLES.find((s) => s.id === m.style)?.emoji ?? ''} ${STYLES.find((s) => s.id === m.style)?.label ?? ''} · ${m.interests
                         .map((i) => INTERESTS.find((x) => x.id === i)?.emoji)
                         .join('')} · ${ago(m.respondedAt)}`
                     : m.isOrganizer
@@ -208,6 +203,19 @@ export default function Dashboard() {
                 )
               })}
             </div>
+          </Card>
+
+          {/* Starting cities */}
+          <Card className="mb-3">
+            <div className="text-sm font-bold">🧳 Coming from</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {ov.origins.map((o) => (
+                <span key={o.key} className={cx('rounded-full px-3 py-1.5 text-sm font-semibold ring-1', o.key === t.me.origin ? 'bg-brand-50 text-brand-700 ring-brand-200' : 'bg-slate-50 text-slate-700 ring-slate-200')}>
+                  {o.key === LOCAL_ORIGIN ? '📍 Already there' : o.key} ×{o.count}
+                </span>
+              ))}
+            </div>
+            {ov.origins.length > 1 && <div className="mt-2 text-xs text-slate-500">Travel is planned from each city, so everyone’s cost is a little different.</div>}
           </Card>
 
           {/* Budget */}
@@ -309,7 +317,7 @@ export default function Dashboard() {
         )}
         {ov.best && n >= 2 && !t.locked && (
           <div className="mt-2 text-center text-xs text-slate-400">
-            Will plan for {fmtRange(ov.best.dates[0], ov.best.dates[ov.best.dates.length - 1])} · from {t.origin}
+            Will plan for {fmtRange(ov.best.dates[0], ov.best.dates[ov.best.dates.length - 1])}
           </div>
         )}
       </BottomBar>

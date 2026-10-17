@@ -3,9 +3,9 @@
  * Used when no OpenAI key is configured or AI_PROVIDER=mock. It still adapts to the group:
  * it picks the destination (if asked), the days that match the group's interests, and the food tier.
  */
-import { tagWeights, type OverlapSummary, type Tier } from '@tripzy/shared'
-import type { RawPlan } from '../schema'
-import type { Planner, PlannerInput } from '../types'
+import { LOCAL_ORIGIN, tagWeights, type OverlapSummary, type Tier } from '@tripzy/shared'
+import type { RawAdjust, RawPlan } from '../schema'
+import type { AdjustInput, Planner, PlannerInput } from '../types'
 import { DESTINATIONS } from './destinations'
 import type { Activity, Alt, Destination, Origin } from './types'
 
@@ -42,7 +42,15 @@ const activity = (a: Activity) => ({
 export function mockPlan(input: PlannerInput): RawPlan {
   const dest = chooseDestination(input.destinationQuery, input.overlap)
   const templates = [dest.arrival, ...pickDays(dest, input.overlap, input.dates.length), dest.departure]
-  const transports = dest.getThere[input.origin as Origin] ?? dest.getThere.Mumbai
+  const travel = input.origins
+    .filter((o) => o.origin !== LOCAL_ORIGIN)
+    .map((o) => ({
+      origin: o.origin,
+      // Sample data covers Mumbai, Delhi, Bengaluru and Pune; other cities borrow Mumbai's options.
+      options: (dest.getThere[o.origin as Origin] ?? dest.getThere.Mumbai).map((t) => ({
+        mode: t.mode, label: t.label, duration: t.duration, departTime: t.depart, arriveTime: null, pricePerPersonOneWay: t.price, note: t.note,
+      })),
+    }))
 
   return {
     destination: { name: dest.name, region: dest.region, emoji: dest.emoji, tagline: dest.tagline },
@@ -52,15 +60,53 @@ export function mockPlan(input: PlannerInput): RawPlan {
       roomRatePerNight: s.pricePerNight * 2, guestsPerRoom: 2, wholeProperty: false,
       rating: s.rating, perks: s.perks, why: s.why,
     })),
-    transports: transports.map((t) => ({
-      mode: t.mode, label: t.label, duration: t.duration, departTime: t.depart, pricePerPersonOneWay: t.price, note: t.note,
-    })),
+    travel,
     foodPerDayPerPerson: dest.foodPerDay[foodTier(input.overlap.budget.min || 20000)],
     tips: [
       'Sample plan (offline mode) — add an OpenAI key for a fully personalised plan.',
       'Book trains early; popular routes fill up weeks ahead in peak season.',
       'Split shared costs as you go with any UPI split app.',
     ],
+  }
+}
+
+const toMin = (t: string) => {
+  const [h, m] = t.split(':').map(Number)
+  return Number.isFinite(h) ? h * 60 + (m || 0) : NaN
+}
+const toHHMM = (n: number) => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
+
+/**
+ * Offline itinerary update: Day 1 starts an hour after the last arrival; later Day-1 items only move
+ * if they would now overlap (each keeps at least an hour after the previous one). Other days are unchanged.
+ */
+export function mockAdjust(input: AdjustInput): RawAdjust {
+  const arrivals = input.travel.map((t) => (t.arrive ? toMin(t.arrive) : NaN)).filter(Number.isFinite)
+  const start = arrivals.length ? Math.max(...arrivals) + 60 : NaN
+  let moved = false
+  let prev = NaN
+  return {
+    days: input.days.map((d, di) => ({
+      title: d.title,
+      items: d.items.map((a, ai) => {
+        let time = a.time
+        if (di === 0 && Number.isFinite(start)) {
+          const floor = ai === 0 ? start : prev + 60
+          const t = Math.min(23 * 60, Math.max(toMin(a.time), floor))
+          if (t !== toMin(a.time)) moved = true
+          prev = t
+          time = toHHMM(t)
+        }
+        return {
+          keepId: a.id,
+          time,
+          emoji: a.emoji, title: a.title, place: a.place, costPerPerson: a.cost, tags: [], why: '',
+          travelFromPrevious: a.travel ? { mode: a.travel.mode, minutes: a.travel.mins, costPerPerson: a.travel.cost } : null,
+          alternatives: [],
+        }
+      }),
+    })),
+    summary: moved ? `Day 1 now starts at ${toHHMM(start)}, an hour after the last arrival.` : 'The itinerary already works with this change.',
   }
 }
 
@@ -71,6 +117,10 @@ export function createMockPlanner(): Planner {
     async generate(input) {
       await new Promise((r) => setTimeout(r, 1200)) // feel like real work
       return mockPlan(input)
+    },
+    async adjust(input) {
+      await new Promise((r) => setTimeout(r, 800))
+      return mockAdjust(input)
     },
   }
 }

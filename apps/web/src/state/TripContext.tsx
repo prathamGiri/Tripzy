@@ -4,7 +4,7 @@
  * While a trip is open, it re-fetches every few seconds so friends' answers and votes appear live.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { CreateTripInput, JobView, MemberView, Preferences, TripView, Vote } from '@tripzy/shared'
+import type { CreateTripInput, JobView, MemberView, Preferences, StayBookingInput, TravelBookingInput, TripView, Vote } from '@tripzy/shared'
 import { ApiError } from '@tripzy/shared'
 import { api } from '../lib/api'
 import { activeMembership, loadSession, saveSession, withMembers, type SessionStore } from '../lib/session'
@@ -24,7 +24,13 @@ interface Ctx {
   getJob: (jobId: string) => Promise<JobView>
   vote: (itemId: string, value: Vote | null) => Promise<void>
   swap: (slotId: string, altId: string | null) => Promise<void>
-  select: (sel: { stayId?: string; transportId?: string }) => Promise<void>
+  select: (sel: { stayId?: string; transportId?: string; origin?: string }) => Promise<void>
+  /** Re-time the itinerary around the current stay and travel. */
+  adjust: () => Promise<JobView>
+  bookStay: (input: StayBookingInput) => Promise<void>
+  unbookStay: () => Promise<void>
+  bookTravel: (origin: string, input: TravelBookingInput) => Promise<void>
+  unbookTravel: (origin: string) => Promise<void>
   lock: () => Promise<void>
   /** Demo: act as another member of this trip. */
   switchMember: (memberId: string) => Promise<void>
@@ -86,14 +92,15 @@ export function TripProvider({ children }: { children: ReactNode }) {
     }
   }, [session.currentTripId, token, fetchTrip])
 
-  // Live updates
+  // Live updates (faster while an itinerary update is running; bookings can still change after locking)
+  const adjusting = !!trip?.plan?.adjustJobId
   useEffect(() => {
-    if (!trip || !token || trip.locked) return
+    if (!trip || !token || (trip.locked && !adjusting)) return
     const id = setInterval(() => {
       if (document.visibilityState === 'visible') fetchTrip(trip.id, token).catch(() => {})
-    }, POLL_MS)
+    }, adjusting ? 1500 : POLL_MS)
     return () => clearInterval(id)
-  }, [trip?.id, trip?.locked, token, fetchTrip])
+  }, [trip?.id, trip?.locked, adjusting, token, fetchTrip])
 
   const value = useMemo<Ctx>(() => {
     const need = () => {
@@ -145,6 +152,28 @@ export function TripProvider({ children }: { children: ReactNode }) {
       select: async (sel) => {
         const { id, token } = need()
         setTrip(await api.select(id, sel, token))
+      },
+      adjust: async () => {
+        const { id, token } = need()
+        const job = await api.adjust(id, token)
+        await fetchTrip(id, token)
+        return job
+      },
+      bookStay: async (input) => {
+        const { id, token } = need()
+        setTrip(await api.bookStay(id, input, token))
+      },
+      unbookStay: async () => {
+        const { id, token } = need()
+        setTrip(await api.unbookStay(id, token))
+      },
+      bookTravel: async (origin, input) => {
+        const { id, token } = need()
+        setTrip(await api.bookTravel(id, origin, input, token))
+      },
+      unbookTravel: async (origin) => {
+        const { id, token } = need()
+        setTrip(await api.unbookTravel(id, origin, token))
       },
       lock: async () => {
         const { id, token } = need()
