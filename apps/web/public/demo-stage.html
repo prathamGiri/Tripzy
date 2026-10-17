@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Tripzy — demo stage</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root { --brand: #f95d36; --sea: #06c4af; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; }
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #fff;
+    background: radial-gradient(1200px 700px at 85% 10%, rgba(249,93,54,.28), transparent 60%),
+                radial-gradient(900px 600px at 10% 100%, rgba(6,196,175,.22), transparent 60%), #0b1120;
+  }
+  .wrap { display: grid; grid-template-columns: 1fr 640px; height: 100%; padding: 0 140px 0 150px; align-items: center; }
+  .logo { display: flex; align-items: center; gap: 12px; font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+  .logo i { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-style: normal; font-size: 26px;
+            background: linear-gradient(135deg, #ff7a55, #e6431c); }
+  .chap { margin-top: 90px; font-size: 22px; font-weight: 700; color: #ff7a55; letter-spacing: .12em; text-transform: uppercase; }
+  h1 { margin-top: 14px; font-size: 68px; line-height: 1.05; font-weight: 800; letter-spacing: -.03em; max-width: 900px; }
+  .cap { margin-top: 26px; font-size: 30px; line-height: 1.45; color: #cbd5e1; max-width: 860px; min-height: 130px; }
+  .cap b { color: #fff; }
+  .fade { transition: opacity .35s ease, transform .35s ease; }
+  .fade.out { opacity: 0; transform: translateY(10px); }
+  .steps { margin-top: 70px; display: flex; gap: 10px; flex-wrap: wrap; max-width: 900px; }
+  .steps span { font-size: 17px; font-weight: 600; padding: 9px 16px; border-radius: 999px; background: rgba(255,255,255,.06); color: #64748b; transition: all .3s; }
+  .steps span.done { color: #94a3b8; }
+  .steps span.on { background: var(--brand); color: #fff; }
+  .timer { position: absolute; left: 150px; bottom: 70px; font-size: 20px; color: #94a3b8; font-weight: 600; display: flex; gap: 10px; align-items: center; }
+  .timer b { color: #fff; font-variant-numeric: tabular-nums; font-size: 24px; }
+
+  .phone { position: relative; width: 470px; height: 960px; justify-self: center; border-radius: 68px; background: #0f172a; padding: 16px;
+           box-shadow: 0 0 0 2px #334155, 0 50px 120px -20px rgba(0,0,0,.7), 0 0 0 10px rgba(255,255,255,.03); }
+  .screen { width: 438px; height: 928px; border-radius: 54px; overflow: hidden; position: relative; background: #f8fafc; }
+  .screen iframe { width: 390px; height: 826px; border: 0; transform: scale(1.1231); transform-origin: 0 0; display: block; }
+  .notch { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); width: 120px; height: 34px; border-radius: 20px; background: #000; z-index: 5; }
+
+  .tap { position: fixed; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; pointer-events: none; z-index: 50;
+         background: rgba(255,255,255,.35); border: 3px solid rgba(255,255,255,.95); box-shadow: 0 4px 20px rgba(0,0,0,.35);
+         animation: tap .55s ease-out forwards; }
+  @keyframes tap { 0% { transform: scale(.4); opacity: 0 } 25% { opacity: 1 } 100% { transform: scale(1.35); opacity: 0 } }
+
+  .card { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; text-align: center; transition: opacity .6s ease;
+          background: radial-gradient(1000px 600px at 50% 0%, rgba(249,93,54,.35), transparent 65%), #0b1120; }
+  .card.hide { opacity: 0; pointer-events: none; }
+  .card .big { font-size: 104px; font-weight: 800; letter-spacing: -.04em; line-height: 1.02; }
+  .card .grad { background: linear-gradient(90deg, #ff7a55, #ec4899); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .card .sub { margin-top: 30px; font-size: 32px; color: #cbd5e1; }
+  .card .logo { justify-content: center; margin-bottom: 50px; font-size: 40px; }
+  .card .logo i { width: 64px; height: 64px; font-size: 34px; border-radius: 18px; }
+  .pill { display: inline-block; margin-top: 44px; padding: 14px 26px; border-radius: 999px; background: rgba(255,255,255,.08); font-size: 24px; font-weight: 600; color: #e2e8f0; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div>
+      <div class="logo"><i>🌴</i>tripzy</div>
+      <div id="text" class="fade">
+        <div class="chap" id="chap">Product walkthrough</div>
+        <h1 id="title">Plan a group trip in minutes</h1>
+        <div class="cap" id="cap"></div>
+      </div>
+      <div class="steps" id="steps"></div>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen"><iframe id="app" src="about:blank"></iframe></div>
+    </div>
+  </div>
+  <div class="timer" id="timer" style="display:none">⏱ Planning time so far <b id="clock">0:00</b></div>
+
+  <div class="card" id="card"><div id="cardInner"></div></div>
+
+<script>
+  const STEPS = ['The problem', 'Create trip', 'Invite', 'Preferences', 'Friends join', 'Overlaps', 'Generate', 'Vote & swap', 'Locked'];
+  const stepsEl = document.getElementById('steps');
+  stepsEl.innerHTML = STEPS.map((s) => `<span>${s}</span>`).join('');
+  let clockStart = null;
+
+  window.stage = {
+    async chapter(i, title, cap) {
+      const t = document.getElementById('text');
+      t.classList.add('out');
+      await new Promise((r) => setTimeout(r, 350));
+      document.getElementById('chap').textContent = i ? `Step ${i} of ${STEPS.length - 1}` : 'Why Tripzy';
+      document.getElementById('title').innerHTML = title;
+      document.getElementById('cap').innerHTML = cap || '';
+      [...stepsEl.children].forEach((el, k) => { el.className = k === i ? 'on' : k < i ? 'done' : ''; });
+      t.classList.remove('out');
+    },
+    async caption(cap) {
+      const c = document.getElementById('cap');
+      c.classList.add('fade', 'out');
+      await new Promise((r) => setTimeout(r, 300));
+      c.innerHTML = cap;
+      c.classList.remove('out');
+    },
+    tap(x, y) {
+      const d = document.createElement('div');
+      d.className = 'tap'; d.style.left = x + 'px'; d.style.top = y + 'px';
+      document.body.appendChild(d);
+      setTimeout(() => d.remove(), 700);
+    },
+    card(html) {
+      document.getElementById('cardInner').innerHTML = html;
+      document.getElementById('card').classList.remove('hide');
+    },
+    hideCard() { document.getElementById('card').classList.add('hide'); },
+    startClock() {
+      clockStart = Date.now();
+      document.getElementById('timer').style.display = 'flex';
+      setInterval(() => {
+        if (!clockStart) return
+        const s = Math.floor((Date.now() - clockStart) / 1000);
+        document.getElementById('clock').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      }, 250);
+    },
+    stopClock() { clockStart = null; },
+  };
+</script>
+</body>
+</html>

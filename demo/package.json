@@ -1,0 +1,13 @@
+{
+  "name": "@tripzy/demo",
+  "private": true,
+  "type": "module",
+  "description": "Records the product walkthrough video. Not part of the app.",
+  "scripts": {
+    "record": "node record-demo.mjs"
+  },
+  "devDependencies": {
+    "ffmpeg-static": "5.2.0",
+    "playwright-core": "1.48.2"
+  }
+}

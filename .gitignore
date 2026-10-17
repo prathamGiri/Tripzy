@@ -1,0 +1,13 @@
+node_modules
+dist
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+# local SQLite database
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+# demo recorder intermediates
+demo/video/raw
+# expo
+apps/mobile/.expo

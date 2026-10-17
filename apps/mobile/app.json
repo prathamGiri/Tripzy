@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Tripzy",
+    "slug": "tripzy",
+    "scheme": "tripzy",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "app.tripzy",
+      "associatedDomains": ["applinks:tripzy.app"]
+    },
+    "android": {
+      "package": "app.tripzy",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [{ "scheme": "https", "host": "tripzy.app", "pathPrefix": "/j/" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "extra": {
+      "apiUrl": "http://192.168.1.4:8787",
+      "webUrl": "http://192.168.1.4:5173"
+    }
+  }
+}

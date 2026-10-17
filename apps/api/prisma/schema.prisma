@@ -1,0 +1,109 @@
+// Tripzy database schema.
+// Local dev uses SQLite. For production switch `provider` to "postgresql" and point DATABASE_URL at Postgres
+// (see docs/deployment.md). JSON payloads are stored as strings so the schema works on both.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Trip {
+  id               String   @id @default(cuid())
+  name             String
+  destinationQuery String? // null = "suggest one for us"
+  origin           String
+  windowStart      String // YYYY-MM-DD
+  windowEnd        String
+  days             Int
+  groupSize        Int
+  inviteCode       String   @unique
+  locked           Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  members Member[]
+  plans   Plan[]
+  jobs    GenerationJob[]
+}
+
+model Member {
+  id          String    @id @default(cuid())
+  tripId      String
+  name        String
+  color       String
+  isOrganizer Boolean   @default(false)
+  isDemoSeed  Boolean   @default(false) // pre-filled demo friend: votes automatically
+  token       String    @unique // secret; sent as "Authorization: Bearer <token>"
+  prefs       String? // JSON Preferences, null until answered
+  respondedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  trip  Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  votes Vote[]
+  swaps Swap[]
+
+  @@index([tripId])
+}
+
+model Plan {
+  id          String   @id @default(cuid())
+  tripId      String
+  version     Int
+  isCurrent   Boolean  @default(true)
+  source      String // "ai" | "mock"
+  document    String // JSON PlanDocument
+  stayId      String
+  transportId String
+  createdAt   DateTime @default(now())
+
+  trip  Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  votes Vote[]
+  swaps Swap[]
+
+  @@index([tripId, isCurrent])
+}
+
+model Vote {
+  id       String @id @default(cuid())
+  planId   String
+  itemId   String
+  memberId String
+  value    String // "up" | "down"
+
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, itemId, memberId])
+}
+
+model Swap {
+  id       String @id @default(cuid())
+  planId   String
+  slotId   String // original activity id
+  altId    String
+  memberId String // who swapped it
+
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, slotId])
+}
+
+model GenerationJob {
+  id        String   @id @default(cuid())
+  tripId    String
+  status    String // queued | running | done | failed
+  stage     String
+  error     String?
+  planId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+}

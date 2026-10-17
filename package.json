@@ -1,0 +1,36 @@
+{
+  "name": "tripzy",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Your whole group, one plan, in under 10 minutes.",
+  "workspaces": [
+    "packages/shared",
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "setup": "npm install && npm run db:migrate",
+    "dev": "concurrently -k -n api,web -c blue,magenta \"npm run dev -w @tripzy/api\" \"npm run dev -w @tripzy/web\"",
+    "dev:api": "npm run dev -w @tripzy/api",
+    "dev:web": "npm run dev -w @tripzy/web",
+    "build": "npm run build -w @tripzy/api && npm run build -w @tripzy/web",
+    "start": "npm run start -w @tripzy/api",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:migrate": "npm run db:migrate -w @tripzy/api",
+    "db:studio": "npm run db:studio -w @tripzy/api"
+  },
+  "devDependencies": {
+    "concurrently": "9.1.0",
+    "typescript": "5.6.3",
+    "vitest": "2.1.8"
+  },
+  "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true,
+    "prisma@5.22.0": true,
+    "esbuild@0.21.5": true,
+    "esbuild@0.24.2": true,
+    "esbuild@0.23.1": true
+  }
+}
